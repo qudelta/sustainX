@@ -1,20 +1,42 @@
 """
 Heat loss calculator for building thermal simulation.
 Calculates heat loss through walls, windows, doors, floor, ceiling, and ventilation.
+Uses thermal conductivity (k-values) and thickness to calculate proper U-values.
 """
 
 from typing import Dict, Optional
 import math
 
-# Material U-values in W/(m²·K)
-MATERIAL_U_VALUES = {
-    "brick": 1.5,
-    "concrete": 3.0,
-    "wood": 0.4,
-    "glass": 5.0,
-    "insulated": 0.3,
+# Thermal conductivity k-values in W/(m·K) - material intrinsic property
+MATERIAL_K_VALUES = {
+    "brick": 0.8,
+    "concrete": 1.4,
+    "wood": 0.14,
+    "insulated": 0.04,  # Insulated wall with foam/fiberglass
+    "glass": 1.0,
     "steel": 50.0,
 }
+
+# Window U-values in W/(m²·K) - pre-calculated for standard assemblies
+WINDOW_U_VALUES = {
+    "single_glazed": 5.8,
+    "double_glazed": 2.8,
+    "triple_glazed": 1.8,
+    "low_e": 1.4,
+}
+
+# Door U-values in W/(m²·K) - pre-calculated for standard assemblies
+DOOR_U_VALUES = {
+    "wood": 2.0,
+    "wood_hollow": 3.5,
+    "steel": 3.0,
+    "fiberglass": 1.8,
+    "glass": 5.0,
+}
+
+# Surface resistance in m²·K/W (air films)
+R_INSIDE = 0.13   # Interior surface resistance
+R_OUTSIDE = 0.04  # Exterior surface resistance
 
 # Sealing air infiltration factors (air changes per hour addition)
 SEALING_FACTORS = {
@@ -30,23 +52,38 @@ AIR_SPECIFIC_HEAT = 1005  # J/(kg·K)
 
 # Unit conversion (frontend uses feet, simulation uses meters)
 FEET_TO_METERS = 0.3048
+INCHES_TO_METERS = 0.0254
 
 
 class HeatLossCalculator:
-    """Calculates heat loss for a single room"""
+    """Calculates heat loss for a single room with proper thermal physics"""
     
     def __init__(self, floorplan: dict, outdoor_temp: float = 5.0):
         self.floorplan = floorplan
         self.outdoor_temp = outdoor_temp
         self._room_volume: Optional[float] = None
-        self._wall_areas: Dict[str, float] = {}
+        self._wall_data: Dict[str, dict] = {}  # Store wall areas and U-values
         self._calculate_geometry()
     
+    def _calculate_u_value(self, k_value: float, thickness_m: float) -> float:
+        """
+        Calculate U-value from thermal conductivity and thickness.
+        U = 1 / R_total
+        R_total = R_inside + (thickness / k) + R_outside
+        """
+        if thickness_m <= 0 or k_value <= 0:
+            # Fallback to typical brick wall
+            thickness_m = 0.2
+            k_value = 0.8
+        
+        R_material = thickness_m / k_value
+        R_total = R_INSIDE + R_material + R_OUTSIDE
+        return 1.0 / R_total
+    
     def _calculate_geometry(self):
-        """Pre-calculate wall areas and room volume"""
+        """Pre-calculate wall areas, U-values, and room volume"""
         walls = self.floorplan.get("walls", [])
         
-        total_wall_area = 0
         for wall in walls:
             # Wall coordinates are in feet, convert to meters
             length_ft = math.sqrt(
@@ -55,44 +92,54 @@ class HeatLossCalculator:
             )
             length_m = length_ft * FEET_TO_METERS
             
-            # Height is also in feet
-            height_ft = wall.get("height", 9.0)  # default 9ft
+            # Height is in feet
+            height_ft = wall.get("height", 9.0)
             height_m = height_ft * FEET_TO_METERS
             
-            area = length_m * height_m
-            self._wall_areas[wall["id"]] = area
-            total_wall_area += area
+            # Thickness is stored in feet, convert to meters
+            thickness_ft = wall.get("thickness", 8/12)  # default 8 inches
+            thickness_m = thickness_ft * FEET_TO_METERS
+            
+            # Get material k-value
+            material = wall.get("material", "brick")
+            k_value = MATERIAL_K_VALUES.get(material, 0.8)
+            
+            # Calculate U-value
+            u_value = self._calculate_u_value(k_value, thickness_m)
+            
+            # Store wall data
+            self._wall_data[wall["id"]] = {
+                "area": length_m * height_m,
+                "u_value": u_value,
+                "thickness_m": thickness_m,
+            }
         
-        # Estimate room volume if not provided
+        # Estimate room volume from floor area
         floor = self.floorplan.get("floor")
         if self.floorplan.get("room_volume"):
             self._room_volume = self.floorplan["room_volume"]
-        elif floor:
-            avg_height = 2.8
+        elif floor and floor.get("area"):
+            avg_height = 2.7  # meters
             if walls:
-                avg_height = sum(w.get("height", 2.8) for w in walls) / len(walls)
+                avg_height = sum(w.get("height", 9) for w in walls) / len(walls) * FEET_TO_METERS
             self._room_volume = floor["area"] * avg_height
         else:
             self._room_volume = 50.0  # Default 50m³
     
-    def get_wall_u_value(self, wall: dict) -> float:
-        """Get U-value for a wall"""
-        if wall.get("u_value"):
-            return wall["u_value"]
-        material = wall.get("material", "brick")
-        return MATERIAL_U_VALUES.get(material, 1.5)
-    
     def calculate_wall_loss(self, indoor_temp: float) -> float:
-        """Calculate heat loss through walls in Watts"""
+        """
+        Calculate heat loss through walls in Watts.
+        Accounts for net wall area (total - windows - doors).
+        """
         walls = self.floorplan.get("walls", [])
         windows = self.floorplan.get("windows", [])
         doors = self.floorplan.get("doors", [])
         
-        # Calculate window/door areas per wall (convert from ft² to m²)
+        # Calculate window/door areas per wall (in m²)
         wall_openings = {}
         for window in windows:
             wall_id = window.get("wall_id")
-            width_m = window.get("width", 3) * FEET_TO_METERS
+            width_m = window.get("width", 4) * FEET_TO_METERS
             height_m = window.get("height", 4) * FEET_TO_METERS
             opening_area = width_m * height_m
             wall_openings[wall_id] = wall_openings.get(wall_id, 0) + opening_area
@@ -108,11 +155,13 @@ class HeatLossCalculator:
         total_loss = 0
         
         for wall in walls:
-            wall_area = self._wall_areas.get(wall["id"], 0)
+            wall_data = self._wall_data.get(wall["id"], {})
+            wall_area = wall_data.get("area", 0)
+            u_value = wall_data.get("u_value", 1.5)
+            
             opening_area = wall_openings.get(wall["id"], 0)
             net_area = max(0, wall_area - opening_area)
             
-            u_value = self.get_wall_u_value(wall)
             total_loss += u_value * net_area * delta_t
         
         return total_loss
@@ -124,11 +173,18 @@ class HeatLossCalculator:
         total_loss = 0
         
         for window in windows:
-            # Convert feet to meters
-            width_m = window.get("width", 3) * FEET_TO_METERS
+            width_m = window.get("width", 4) * FEET_TO_METERS
             height_m = window.get("height", 4) * FEET_TO_METERS
             area = width_m * height_m
-            u_value = window.get("u_value", 2.8)
+            
+            # Get U-value from glass type
+            glass_type = window.get("material", "double_glazed")
+            u_value = WINDOW_U_VALUES.get(glass_type, 2.8)
+            
+            # Override with explicit U-value if provided
+            if window.get("u_value"):
+                u_value = window["u_value"]
+            
             total_loss += u_value * area * delta_t
         
         return total_loss
@@ -140,11 +196,18 @@ class HeatLossCalculator:
         total_loss = 0
         
         for door in doors:
-            # Convert feet to meters
             width_m = door.get("width", 3) * FEET_TO_METERS
             height_m = door.get("height", 7) * FEET_TO_METERS
             area = width_m * height_m
-            u_value = door.get("u_value", 2.0)
+            
+            # Get U-value from door material
+            door_material = door.get("material", "wood")
+            u_value = DOOR_U_VALUES.get(door_material, 2.0)
+            
+            # Override with explicit U-value if provided
+            if door.get("u_value"):
+                u_value = door["u_value"]
+            
             total_loss += u_value * area * delta_t
         
         return total_loss
@@ -160,7 +223,10 @@ class HeatLossCalculator:
         if floor.get("type") == "ground":
             delta_t *= 0.5
         
-        return floor.get("u_value", 0.5) * floor.get("area", 20) * delta_t
+        u_value = floor.get("u_value", 0.5)
+        area = floor.get("area", 20)
+        
+        return u_value * area * delta_t
     
     def calculate_ceiling_loss(self, indoor_temp: float) -> float:
         """Calculate heat loss through ceiling in Watts"""
@@ -169,7 +235,10 @@ class HeatLossCalculator:
             return 0
         
         delta_t = indoor_temp - self.outdoor_temp
-        return ceiling.get("u_value", 0.3) * ceiling.get("area", 20) * delta_t
+        u_value = ceiling.get("u_value", 0.3)
+        area = ceiling.get("area", 20)
+        
+        return u_value * area * delta_t
     
     def calculate_ventilation_loss(self, indoor_temp: float) -> float:
         """Calculate heat loss through ventilation in Watts"""

@@ -78,7 +78,7 @@ class SimulationEngine:
         heating_on_count = 0
         samples_in_interval = 0
         
-        while current_second <= total_seconds:
+        while current_second < total_seconds:
             # Calculate heat loss at current temperature
             loss_breakdown = self.heat_loss_calc.calculate_total_loss(indoor_temp)
             total_loss = loss_breakdown["total"]

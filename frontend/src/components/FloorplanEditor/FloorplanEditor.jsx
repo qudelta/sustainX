@@ -272,7 +272,7 @@ export default function FloorplanEditor({ floorplan, onChange }) {
             x2: startX + 10,
             y2: startY,
             height: 9, // feet (about 2.7m)
-            thickness: 0.66, // feet (about 0.2m)
+            thickness: 9 / 12, // feet (9 inches default)
             material: 'brick',
         };
 
@@ -683,6 +683,15 @@ export default function FloorplanEditor({ floorplan, onChange }) {
                                                         step={0.5}
                                                         min={1}
                                                         max={30}
+                                                    />
+                                                    <NumberInput
+                                                        label="Thickness (inches)"
+                                                        value={(wall.thickness || 8) * 12}
+                                                        onChange={(v) => updateWall(wall.id, { thickness: v / 12 })}
+                                                        step={1}
+                                                        min={2}
+                                                        max={24}
+                                                        description="Wall thickness affects heat loss"
                                                     />
                                                     <Select
                                                         label="Material"
