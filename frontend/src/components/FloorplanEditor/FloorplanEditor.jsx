@@ -66,25 +66,28 @@ export default function FloorplanEditor({ floorplan, onChange }) {
   const generateId = () =>
     `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-  // calculate resistance and U-value of the floor (includes both the floor
-  // constrution material and the material used for flooring like blankets
-  // and carpets)
-  const [flooringResistance, setFlooringResistance] = useState([]);
 
-  const calcTotalResistance = (resistanceArr) => {
-    setFlooringResistance(resistanceArr);
-    const RValue = resistanceArr.map(Number);
-    const floorResistance = 1 / 1.8; //default base is 1.8 (u value of concrete)
-    const totalFloorResistance =
+  const [flooringResistance, setFlooringResistance] = useState([]);
+  const [ceilingResistance, setCeilingResistance] = useState([]);
+
+  //calculating final U value for the floor and ceiling.
+  const calcFinalUValue = (type, resistanceValueArr) => {
+    type === "floor"
+      ? setFlooringResistance(resistanceValueArr)
+      : setCeilingResistance(resistanceValueArr);
+
+    const RValue = resistanceValueArr.map(Number);
+    const resistance = 1 / 1.8; //default base is 1.8 (u-value of concrete)
+    const totalResistance =
       RValue.reduce(
         (accumulator, currentValue) => accumulator + currentValue,
         0,
-      ) + floorResistance;
-    const floor_u_value = { u_value: 1 / totalFloorResistance };
+      ) + resistance;
+    const final_u_value = 1 / totalResistance ;
 
     onChange({
       ...floorplan,
-      floor: { ...floorplan.floor, ...floor_u_value },
+      [type]: { ...floorplan[type], u_value: final_u_value },
     });
   };
 
@@ -973,7 +976,11 @@ export default function FloorplanEditor({ floorplan, onChange }) {
                       decimalScale={2}
                     />
                   </Tooltip>
-                  <Tooltip label="add tooltip here" multiline w={250}>
+                  <Tooltip
+                    label="Common materials used for flooring"
+                    multiline
+                    w={250}
+                  >
                     <MultiSelect
                       label="Material Used for Flooring"
                       placeholder="Pick material(s)"
@@ -986,7 +993,9 @@ export default function FloorplanEditor({ floorplan, onChange }) {
                         { value: "0.05", label: "Laminate Wood (HDF 8mm)" },
                       ]}
                       value={flooringResistance}
-                      onChange={(valueArr) => calcTotalResistance(valueArr)}
+                      onChange={(valueArr) =>
+                        calcFinalUValue("floor", valueArr)
+                      }
                     />
                   </Tooltip>
 
@@ -1011,6 +1020,41 @@ export default function FloorplanEditor({ floorplan, onChange }) {
                       min={0.1}
                       max={5}
                       decimalScale={2}
+                    />
+                  </Tooltip>
+                  <Tooltip
+                    label="Common materials used for ceiling"
+                    multiline
+                    w={250}
+                  >
+                    <MultiSelect
+                      label="Material Used for Ceiling"
+                      placeholder="Pick material(s)"
+                      data={[
+                        {
+                          value: "0.18",
+                          label: "Unventilated Air Gap (150-200mm)",
+                        },
+                        { value: "0.08", label: "Gypsum Board (12.5mm)" },
+                        { value: "0.11", label: "PVC Ceiling Panels (Hollow)" },
+                        {
+                          value: "0.03",
+                          label: "POP (Plaster of Paris) Layer (12mm)",
+                        },
+                        {
+                          value: "0.25",
+                          label: "Wooden Paneling (Deodar 20mm)",
+                        },
+                        {
+                          value: "0.45",
+                          label: "Khatamband (Wood + Pocketed Air)",
+                        },
+                        { value: "1.25", label: "Glasswool Insulation (50mm)" },
+                      ]}
+                      value={ceilingResistance}
+                      onChange={(valueArr) =>
+                        calcFinalUValue("ceiling", valueArr)
+                      }
                     />
                   </Tooltip>
                 </Stack>
