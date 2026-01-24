@@ -36,8 +36,8 @@ export default function EditorPage() {
         walls: [],
         windows: [],
         doors: [],
-        floor: { area: 20, u_value: 1.8, type: 'ground' },
-        ceiling: { area: 20, u_value: 1.8, type: 'roof' },
+        floor: { area: 20, u_value: 0.7, type: 'ground' },
+        ceiling: { area: 20, u_value: 0.9, type: 'roof' },
         ventilation: { air_changes_per_hour: 0.5, exhaust_rate: 0 },
     });
 

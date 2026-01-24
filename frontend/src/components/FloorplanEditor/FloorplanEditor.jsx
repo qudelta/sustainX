@@ -15,6 +15,7 @@ import {
   Badge,
   Alert,
   MultiSelect,
+  SimpleGrid,
 } from "@mantine/core";
 
 const MATERIALS = [
@@ -66,24 +67,27 @@ export default function FloorplanEditor({ floorplan, onChange }) {
   const generateId = () =>
     `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-
   const [flooringResistance, setFlooringResistance] = useState([]);
   const [ceilingResistance, setCeilingResistance] = useState([]);
 
-  //calculating final U value for the floor and ceiling.
-  const calcFinalUValue = (type, resistanceValueArr) => {
-    type === "floor"
-      ? setFlooringResistance(resistanceValueArr)
-      : setCeilingResistance(resistanceValueArr);
+  // Base U-value for an uninsulated medium-sized concrete ground floor
+  // Used as the baseline before adding insulating layers
+  const BASE_GROUND_FLOOR_U = 0.7;
 
-    const RValue = resistanceValueArr.map(Number);
-    const resistance = 1 / 1.8; //default base is 1.8 (u-value of concrete)
+  //calculating final U value for the floor and ceiling.
+  const calcFinalUValue = (type, RValueArr) => {
+    type === "floor"
+      ? setFlooringResistance(RValueArr)
+      : setCeilingResistance(RValueArr);
+
+    const RValue = RValueArr.map(Number);
+    const resistance = 1 / BASE_GROUND_FLOOR_U; //default base
     const totalResistance =
       RValue.reduce(
         (accumulator, currentValue) => accumulator + currentValue,
         0,
       ) + resistance;
-    const final_u_value = 1 / totalResistance ;
+    const final_u_value = 1 / totalResistance;
 
     onChange({
       ...floorplan,
@@ -964,8 +968,8 @@ export default function FloorplanEditor({ floorplan, onChange }) {
                     w={250}
                   >
                     <NumberInput
-                      label="U-value (W/m²·K)"
-                      description="Lower = better insulation. Default 1.8 which is the U-value of Cement."
+                      label="Calculated U-value (W/m²·K)"
+                      description="Lower = better insulation. Default 0.7 which is the U-value of Concrete."
                       value={floorplan.floor?.u_value || 0.5}
                       onChange={(v) =>
                         updateFloorCeiling("floor", { u_value: v })
@@ -987,10 +991,13 @@ export default function FloorplanEditor({ floorplan, onChange }) {
                       data={[
                         //value = resistance of the material.
                         { value: "0.29", label: "EPE Foam (10mm)" },
-                        { value: "0.30", label: "Wool Carpet (15mm)" },
-                        { value: "0.42", label: "Wool Blankets (15mm)" },
-                        { value: "0.25", label: "Wood Flooring (Deodar 30mm)" },
-                        { value: "0.05", label: "Laminate Wood (HDF 8mm)" },
+                        { value: "0.33", label: "Wool Carpet (15mm)" },
+                        { value: "0.40", label: "Wool Blankets (15mm)" },
+                        {
+                          value: "0.23",
+                          label: "Wood Flooring (Deodar 30mm)",
+                        },
+                        { value: "0.07", label: "Laminate Wood (HDF 8mm)" },
                       ]}
                       value={flooringResistance}
                       onChange={(valueArr) =>
@@ -1011,7 +1018,7 @@ export default function FloorplanEditor({ floorplan, onChange }) {
                   >
                     <NumberInput
                       label="U-value (W/m²·K)"
-                      description="Lower = better insulation"
+                      description="Lower = better insulation. Default 0.7 which is the U-value of Intermediate Renforced Concrete slab."
                       value={floorplan.ceiling?.u_value || 0.3}
                       onChange={(v) =>
                         updateFloorCeiling("ceiling", { u_value: v })
