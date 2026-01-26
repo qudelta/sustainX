@@ -71,10 +71,7 @@ export default function EditorPage() {
 
     const handleRunSimulation = async (config) => {
         try {
-            // Save floorplan first
             await updateFloorplan(projectId, floorplan);
-
-            // Create simulation job
             const job = await createJob(projectId, config);
             navigate(`/project/${projectId}/simulation/${job.id}`);
         } catch (error) {
@@ -130,6 +127,17 @@ export default function EditorPage() {
                 </Tabs.Panel>
 
                 <Tabs.Panel value="history">
+                    {/* Refresh Button */}
+                    <Group justify="flex-end" mb="sm">
+                        <Button
+                            size="xs"
+                            variant="outline"
+                            onClick={() => fetchProjectJobs(projectId)}
+                        >
+                            Refresh
+                        </Button>
+                    </Group>
+
                     <Stack>
                         {jobs.length === 0 ? (
                             <Text c="dimmed" ta="center" py="xl">
