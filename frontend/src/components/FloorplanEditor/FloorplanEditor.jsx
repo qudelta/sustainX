@@ -15,7 +15,7 @@ import {
   Badge,
   Alert,
   MultiSelect,
-  Checkbox,
+  Radio,
 } from "@mantine/core";
 
 const MATERIALS = [
@@ -69,24 +69,32 @@ export default function FloorplanEditor({ floorplan, onChange }) {
 
   const [flooringResistance, setFlooringResistance] = useState([]);
   const [ceilingResistance, setCeilingResistance] = useState([]);
-  const [checked, setChecked] = useState(false);
+  const [ceilingPlacement, setCeilingPlacement] = useState();
+
   // Base U-value for an uninsulated medium-sized concrete ground floor
   // Used as the baseline before adding insulating layers
   const BASE_GROUND_FLOOR_U = 0.7;
+  const INTERMEDIATE_CEILING_U = 0.9;
 
   //calculating final U value for the floor and ceiling.
   const calcFinalUValue = (type, RValueArr) => {
-    type === "floor"
-      ? setFlooringResistance(RValueArr)
-      : setCeilingResistance(RValueArr);
+    let base_resistance;
+    if (type === "floor") {
+      setFlooringResistance(RValueArr);
+      base_resistance = 1 / BASE_GROUND_FLOOR_U;
+    } else {
+      setCeilingResistance(RValueArr);
+      base_resistance = 1 / INTERMEDIATE_CEILING_U;
+    }
 
     const RValue = RValueArr.map(Number);
-    const resistance = 1 / BASE_GROUND_FLOOR_U; //default base
+
     const totalResistance =
       RValue.reduce(
         (accumulator, currentValue) => accumulator + currentValue,
         0,
-      ) + resistance;
+      ) + base_resistance;
+
     const final_u_value = 1 / totalResistance;
 
     onChange({
@@ -95,20 +103,15 @@ export default function FloorplanEditor({ floorplan, onChange }) {
     });
   };
 
-  const handleRoofCeiling = (type, value) => {
-    setChecked(!checked)
-    setCeilingResistance([])
-    if (value) {
-      onChange({
-        ...floorplan,
-        [type]: { ...floorplan[type], u_value: 3.0 },
-      });
-    } else {
-      onChange({
-        ...floorplan,
-        [type]: { ...floorplan[type], u_value: 0.9 },
-      });
-    }
+  const handleCeilingPlacement = (type, value) => {
+    const v = parseFloat(value);
+    console.log(type, v);
+    setCeilingPlacement(v);
+    setCeilingResistance([]);
+    onChange({
+      ...floorplan,
+      [type]: { ...floorplan[type], u_value: value },
+    });
   };
 
   // Calculate wall length in feet
@@ -1027,13 +1030,29 @@ export default function FloorplanEditor({ floorplan, onChange }) {
                   <Text fw={500} size="sm">
                     Ceiling
                   </Text>
-                  <Checkbox
-                    label="Is ceiling directly in contact with the outdoor air?"
-                    checked={checked}
-                    onChange={(event) =>
-                      handleRoofCeiling("ceiling", event.currentTarget.checked)
-                    }
-                  />
+
+                  <Radio.Group
+                    value={ceilingPlacement}
+                    onChange={(v) => handleCeilingPlacement("ceiling", v)}
+                    name="ceilingPlacement"
+                    label="Select your ceiling placement"
+                  >
+                    <Group mt="xs">
+                      <Radio value={0.9} label="Ceiling is between floors" />
+                      <Radio
+                        value={2.9}
+                        label="It is the topmost ceiling incontact with outdoor air"
+                      />
+                      <Radio
+                        value={1.2}
+                        label="The ceiling has a traditional hall above it with pitched roof"
+                      />
+                      <Radio
+                        value={1.7}
+                        label="Ceiling is under storage/large air gap under pitched roof"
+                      />
+                    </Group>
+                  </Radio.Group>
                   <Tooltip
                     label="U-value measures thermal transmittance. Lower values mean better insulation. Typical: Well-insulated roof 0.15-0.25, Uninsulated 1.0+"
                     multiline
@@ -1041,7 +1060,7 @@ export default function FloorplanEditor({ floorplan, onChange }) {
                   >
                     <NumberInput
                       label="U-value (W/m²·K)"
-                      description="Lower = better insulation. Default 0.7 which is the U-value of Intermediate Renforced Concrete slab."
+                      description="Lower = better insulation. Default 0.9 which is the U-value of Intermediate Renforced Concrete slab."
                       value={floorplan.ceiling?.u_value || 0.3}
                       onChange={(v) =>
                         updateFloorCeiling("ceiling", { u_value: v })
