@@ -15,7 +15,7 @@ import {
   Badge,
   Alert,
   MultiSelect,
-  SimpleGrid,
+  Checkbox,
 } from "@mantine/core";
 
 const MATERIALS = [
@@ -69,7 +69,7 @@ export default function FloorplanEditor({ floorplan, onChange }) {
 
   const [flooringResistance, setFlooringResistance] = useState([]);
   const [ceilingResistance, setCeilingResistance] = useState([]);
-
+  const [checked, setChecked] = useState(false);
   // Base U-value for an uninsulated medium-sized concrete ground floor
   // Used as the baseline before adding insulating layers
   const BASE_GROUND_FLOOR_U = 0.7;
@@ -93,6 +93,22 @@ export default function FloorplanEditor({ floorplan, onChange }) {
       ...floorplan,
       [type]: { ...floorplan[type], u_value: final_u_value },
     });
+  };
+
+  const handleRoofCeiling = (type, value) => {
+    setChecked(!checked)
+    setCeilingResistance([])
+    if (value) {
+      onChange({
+        ...floorplan,
+        [type]: { ...floorplan[type], u_value: 3.0 },
+      });
+    } else {
+      onChange({
+        ...floorplan,
+        [type]: { ...floorplan[type], u_value: 0.9 },
+      });
+    }
   };
 
   // Calculate wall length in feet
@@ -1011,6 +1027,13 @@ export default function FloorplanEditor({ floorplan, onChange }) {
                   <Text fw={500} size="sm">
                     Ceiling
                   </Text>
+                  <Checkbox
+                    label="Is ceiling directly in contact with the outdoor air?"
+                    checked={checked}
+                    onChange={(event) =>
+                      handleRoofCeiling("ceiling", event.currentTarget.checked)
+                    }
+                  />
                   <Tooltip
                     label="U-value measures thermal transmittance. Lower values mean better insulation. Typical: Well-insulated roof 0.15-0.25, Uninsulated 1.0+"
                     multiline
