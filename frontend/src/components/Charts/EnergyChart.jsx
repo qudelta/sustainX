@@ -22,21 +22,14 @@ const INTERVALS = [
 export default function EnergyChart({ data, height = 350 }) {
     const [interval, setInterval] = useState('all');
 
-    // Calculate cumulative energy
+    // Use backend-provided cumulative energy
     const chartData = useMemo(() => {
-        let cumulative = 0;
-        return data.map((point, index) => {
-            const timestepHours = index > 0
-                ? (point.time_minutes - data[index - 1].time_minutes) / 60
-                : 0;
-            const energyWh = point.heating_on ? point.heating_power * timestepHours : 0;
-            cumulative += energyWh;
-
+        return data.map((point) => {
             return {
                 ...point,
                 time_hours: parseFloat((point.time_minutes / 60).toFixed(2)),
-                energy_kwh: parseFloat((cumulative / 1000).toFixed(3)),
-                power_kw: parseFloat((point.heating_power / 1000).toFixed(2)),
+                energy_kwh: parseFloat(((point.cumulative_energy_wh || 0) / 1000).toFixed(3)),
+                power_kw: parseFloat(((point.heating_power || 0) / 1000).toFixed(2)),
             };
         });
     }, [data]);

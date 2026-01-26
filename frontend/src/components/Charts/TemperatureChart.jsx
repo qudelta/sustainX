@@ -85,9 +85,10 @@ export default function TemperatureChart({ data, height = 350 }) {
                             domain={yDomain}
                         />
                         <Tooltip
-                            formatter={(value, name) => {
+                            formatter={(value, name, props) => {
                                 if (name === 'indoor_temp') return [`${value}°C`, 'Temperature'];
                                 if (name === 'heating_on') return [value ? 'On' : 'Off', 'Heating'];
+                                if (name === 'energy_wh') return [`${value} Wh`, 'Interval Energy'];
                                 return [value, name];
                             }}
                             labelFormatter={(label) => `Time: ${label}h`}

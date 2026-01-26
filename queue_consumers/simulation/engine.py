@@ -19,7 +19,7 @@ THERMAL_MASS_MULTIPLIER = 8.0
 
 # Simulation parameters
 INTERNAL_TIMESTEP_SECONDS = 30  # 30-second internal timesteps for stability
-RECORDING_INTERVAL_MINUTES = 5  # Record data every 5 minutes
+DEFAULT_RECORDING_INTERVAL_MINUTES = 5
 
 
 class SimulationEngine:
@@ -32,6 +32,7 @@ class SimulationEngine:
         self.outdoor_temp = config.get("outdoor_temperature", 5.0)
         self.initial_temp = config.get("initial_indoor_temp", 18.0)
         self.duration_hours = config.get("duration_hours", 24)
+        self.recording_interval_minutes = config.get("timestep_minutes", DEFAULT_RECORDING_INTERVAL_MINUTES)
         
         self.heat_loss_calc = HeatLossCalculator(floorplan, self.outdoor_temp)
         self.heating_ctrl = HeatingController(config)
@@ -54,10 +55,12 @@ class SimulationEngine:
         """Run the simulation and return results"""
         # Calculate total simulation time in seconds
         total_seconds = self.duration_hours * 3600
-        recording_interval_seconds = RECORDING_INTERVAL_MINUTES * 60
+        recording_interval_seconds = int(self.recording_interval_minutes * 60)
         
         time_series = []
         total_energy_wh = 0
+        cumulative_energy_wh = 0
+        
         heat_loss_totals = {
             "walls": 0,
             "windows": 0,
@@ -75,6 +78,7 @@ class SimulationEngine:
         # Variables for averaging within recording intervals
         temp_sum = 0
         power_sum = 0
+        energy_this_interval_wh = 0
         heating_on_count = 0
         samples_in_interval = 0
         
@@ -87,6 +91,17 @@ class SimulationEngine:
             time_minutes = current_second // 60
             heating_power, heating_on = self.heating_ctrl.get_heating_power(indoor_temp, time_minutes)
             
+            # Physics: calculate temperature change
+            # dT = (Q_in - Q_out) * dt / C
+            net_power = heating_power - total_loss  # Watts
+            temp_change = (net_power * INTERNAL_TIMESTEP_SECONDS) / self.thermal_capacity
+            
+            # Cumulative physics tracking
+            step_energy_wh = heating_power * (INTERNAL_TIMESTEP_SECONDS / 3600)
+            energy_this_interval_wh += step_energy_wh
+            cumulative_energy_wh += step_energy_wh
+            total_energy_wh += step_energy_wh
+            
             # Accumulate for averaging
             temp_sum += indoor_temp
             power_sum += heating_power
@@ -98,10 +113,6 @@ class SimulationEngine:
             for key in heat_loss_totals:
                 heat_loss_totals[key] += loss_breakdown.get(key, 0) * INTERNAL_TIMESTEP_SECONDS / 3600
             
-            # Track energy usage
-            if heating_on:
-                total_energy_wh += heating_power * (INTERNAL_TIMESTEP_SECONDS / 3600)
-            
             # Record data point at intervals
             if current_second - last_recording_second >= recording_interval_seconds:
                 avg_temp = temp_sum / samples_in_interval if samples_in_interval > 0 else indoor_temp
@@ -111,26 +122,24 @@ class SimulationEngine:
                 time_series.append({
                     "time_minutes": current_second // 60,
                     "indoor_temp": round(avg_temp, 2),
-                    "heating_on": heating_ratio > 0.5,  # Majority on during interval
+                    "heating_on": heating_ratio > 0.0,  # Any heating in interval counts as On for visualization
                     "heating_power": round(avg_power, 1),
+                    "energy_wh": round(energy_this_interval_wh, 3),
+                    "cumulative_energy_wh": round(cumulative_energy_wh, 3),
                 })
                 
                 # Reset accumulators
                 temp_sum = 0
                 power_sum = 0
+                energy_this_interval_wh = 0
                 heating_on_count = 0
                 samples_in_interval = 0
                 last_recording_second = current_second
             
-            # Physics: calculate temperature change
-            # dT = (Q_in - Q_out) * dt / C
-            net_power = heating_power - total_loss  # Watts
-            temp_change = (net_power * INTERNAL_TIMESTEP_SECONDS) / self.thermal_capacity
-            
-            # Apply temperature change (no clamping needed with proper timestep)
+            # Apply temperature change
             indoor_temp += temp_change
             
-            # Safety bounds (should never be needed with good physics)
+            # Safety bounds
             indoor_temp = max(-20, min(60, indoor_temp))
             
             # Advance time

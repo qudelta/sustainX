@@ -1,27 +1,26 @@
-# Build stage
-FROM node:20-alpine AS builder
-
+# 1. Base stage with system dependencies
+FROM node:20-alpine AS base
 WORKDIR /app
 
+# 2. Dependencies stage (cached)
+FROM base AS dependencies
 COPY package*.json ./
-RUN npm install
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci
 
+# 3. Development stage (inherits node_modules from base)
+# We use a trick: builder/dev stages inherit from dependencies but we don't COPY --from
+# because they ARE the same file system layers.
+FROM dependencies AS development
+EXPOSE 3000
+CMD ["npm", "run", "dev"]
+
+# 4. Build stage (inherits node_modules from dependencies)
+FROM dependencies AS builder
 COPY . .
 RUN npm run build
 
-# Development stage
-FROM node:20-alpine AS development
-
-WORKDIR /app
-
-COPY package*.json ./
-RUN npm install
-
-EXPOSE 3000
-
-CMD ["npm", "run", "dev"]
-
-# Production stage
+# 5. Production stage (Final)
 FROM nginx:alpine AS production
 
 # Remove default nginx config
