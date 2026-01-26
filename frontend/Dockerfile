@@ -8,11 +8,18 @@ COPY package*.json ./
 RUN --mount=type=cache,target=/root/.npm \
     npm ci
 
-# 3. Development stage (inherits node_modules from base)
-# We use a trick: builder/dev stages inherit from dependencies but we don't COPY --from
-# because they ARE the same file system layers.
+# 3. Development stage - preserve node_modules from build
 FROM dependencies AS development
+
+# Store built node_modules in /tmp for entrypoint to copy on first run
+RUN cp -r /app/node_modules /tmp/node_modules
+
+# Copy entrypoint script
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
 EXPOSE 3000
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["npm", "run", "dev"]
 
 # 4. Build stage (inherits node_modules from dependencies)
