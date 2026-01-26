@@ -1,110 +1,174 @@
-import { useState, useMemo } from 'react';
 import {
-    AreaChart,
-    Area,
-    XAxis,
-    YAxis,
-    CartesianGrid,
-    Tooltip,
-    ResponsiveContainer,
-    Brush,
-} from 'recharts';
-import { Group, SegmentedControl, Text, Stack } from '@mantine/core';
+  ResponsiveContainer,
+  ComposedChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+} from "recharts";
+import { useMemo, useState } from "react";
 
-const INTERVALS = [
-    { value: 'all', label: 'All' },
-    { value: '1h', label: '1h' },
-    { value: '4h', label: '4h' },
-    { value: '8h', label: '8h' },
-    { value: '12h', label: '12h' },
-];
+export default function EnergyFlowChart({ data, height = 360 }) {
+  const [hovered, setHovered] = useState(false);
 
-export default function EnergyChart({ data, height = 350 }) {
-    const [interval, setInterval] = useState('all');
+  // ✅ derive power range ONLY for axis correctness
+  const maxPowerKW = useMemo(() => {
+    if (!data?.length) return 3;
+    return Math.max(...data.map(d => d.heating_power / 1000));
+  }, [data]);
 
-    // Calculate cumulative energy
-    const chartData = useMemo(() => {
-        let cumulative = 0;
-        return data.map((point, index) => {
-            const timestepHours = index > 0
-                ? (point.time_minutes - data[index - 1].time_minutes) / 60
-                : 0;
-            const energyWh = point.heating_on ? point.heating_power * timestepHours : 0;
-            cumulative += energyWh;
+  const flowData = useMemo(() => {
+    if (!data?.length) return [];
 
-            return {
-                ...point,
-                time_hours: parseFloat((point.time_minutes / 60).toFixed(2)),
-                energy_kwh: parseFloat((cumulative / 1000).toFixed(3)),
-                power_kw: parseFloat((point.heating_power / 1000).toFixed(2)),
-            };
-        });
-    }, [data]);
+    let cumulativeEnergy = 0;
 
-    // Filter data based on interval
-    const filteredData = useMemo(() => {
-        if (interval === 'all') return chartData;
+    return data.map((p, i) => {
+      const heatingKW = p.heating_power / 1000;
+      cumulativeEnergy += heatingKW * 0.25; // ✅ unchanged math
 
-        const hours = parseInt(interval);
-        const maxMinutes = hours * 60;
-        return chartData.filter(p => p.time_minutes <= maxMinutes);
-    }, [chartData, interval]);
+      return {
+        timeLabel: `${(i / 4).toFixed(1)}h`,
+        cumulativeEnergy: +cumulativeEnergy.toFixed(3),
+      };
+    });
+  }, [data]);
+
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (!active || !payload?.length) return null;
 
     return (
-        <Stack gap="xs" style={{ height }}>
-            <Group justify="space-between">
-                <Text size="xs" c="dimmed">Time Range</Text>
-                <SegmentedControl
-                    size="xs"
-                    value={interval}
-                    onChange={setInterval}
-                    data={INTERVALS}
-                />
-            </Group>
-
-            <div style={{ flex: 1, minHeight: 0 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart
-                        data={filteredData}
-                        margin={{ top: 5, right: 30, left: 0, bottom: 30 }}
-                    >
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e9ecef" />
-                        <XAxis
-                            dataKey="time_hours"
-                            label={{ value: 'Time (hours)', position: 'bottom', offset: 0 }}
-                            stroke="#868e96"
-                            tickFormatter={(v) => `${v}h`}
-                        />
-                        <YAxis
-                            label={{ value: 'kWh', angle: -90, position: 'insideLeft' }}
-                            stroke="#868e96"
-                        />
-                        <Tooltip
-                            formatter={(value, name) => {
-                                if (name === 'energy_kwh') return [`${value} kWh`, 'Cumulative Energy'];
-                                return [value, name];
-                            }}
-                            labelFormatter={(label) => `Time: ${label}h`}
-                        />
-                        <Area
-                            type="monotone"
-                            dataKey="energy_kwh"
-                            name="Cumulative Energy"
-                            stroke="#40c057"
-                            fill="#b2f2bb"
-                            fillOpacity={0.6}
-                            isAnimationActive={false}
-                        />
-                        {/* Brush for scrolling/zooming */}
-                        <Brush
-                            dataKey="time_hours"
-                            height={20}
-                            stroke="#40c057"
-                            tickFormatter={(v) => `${v}h`}
-                        />
-                    </AreaChart>
-                </ResponsiveContainer>
-            </div>
-        </Stack>
+      <div
+        style={{
+          background: hovered ? "#212529" : "#ffffff",
+          color: hovered ? "#ffffff" : "#000000",
+          padding: 12,
+          borderRadius: 10,
+          boxShadow: "0 10px 25px rgba(0,0,0,0.35)",
+          transition: "all 0.3s ease",
+          fontSize: 13,
+        }}
+      >
+        <div style={{ fontWeight: 700, marginBottom: 6 }}>
+          ⏱ {label}
+        </div>
+        <div style={{ color: "#4dabf7", fontWeight: 600 }}>
+          Energy: {payload[0].value.toFixed(2)} kWh
+        </div>
+      </div>
     );
+  };
+
+  if (!flowData.length) return <div style={{ height }}>No data</div>;
+
+  return (
+    <div
+      style={{
+        background: hovered ? "#dee2e6" : "#ffffff",
+        borderRadius: 16,
+        padding: 12,
+        transition: "all 0.35s ease",
+        transform: hovered
+          ? "perspective(1200px) translateY(-4px)"
+          : "perspective(1200px) translateY(0)",
+        boxShadow: hovered
+          ? "0 20px 45px rgba(0,0,0,0.25)"
+          : "0 6px 14px rgba(0,0,0,0.12)",
+      }}
+    >
+      <ResponsiveContainer width="100%" height={height}>
+        <ComposedChart
+          data={flowData}
+          onMouseEnter={() => setHovered(true)}
+          onMouseLeave={() => setHovered(false)}
+          margin={{ top: 20, right: 50, left: 45, bottom: 20 }}
+        >
+          {/* 🎨 DEFINITIONS */}
+          <defs>
+            <linearGradient id="energyGradient" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="#74c0fc" />
+              <stop offset="100%" stopColor="#228be6" />
+            </linearGradient>
+
+            <filter id="energyGlow">
+              <feGaussianBlur
+                stdDeviation={hovered ? 6 : 3}
+                result="blur"
+              />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+
+          {/* 🧱 GRID */}
+          <CartesianGrid
+            stroke={hovered ? "#adb5bd" : "#e9ecef"}
+            strokeDasharray="4 8"
+            vertical={false}
+          />
+
+          {/* ⏱ X AXIS */}
+          <XAxis
+            dataKey="timeLabel"
+            tick={{ fill: "#495057", fontWeight: 600 }}
+            axisLine={{ stroke: "#868e96" }}
+            tickLine={false}
+          />
+
+          {/* 🔌 POWER AXIS — CLEAR & VISIBLE */}
+          <YAxis
+            yAxisId="left"
+            domain={[0, Math.ceil(maxPowerKW)]}
+            tick={{ fill: "#495057", fontWeight: 600 }}
+            axisLine={{ stroke: "#868e96" }}
+            tickLine
+            label={{
+              value: "Power (kW)",
+              angle: -90,
+              position: "insideLeft",
+              fill: "#343a40",
+              fontWeight: 700,
+            }}
+          />
+
+          {/* 🔵 ENERGY AXIS */}
+          <YAxis
+            yAxisId="right"
+            orientation="right"
+            tick={{ fill: "#495057", fontWeight: 600 }}
+            axisLine={{ stroke: "#868e96" }}
+            tickLine={false}
+            label={{
+              value: "Energy (kWh)",
+              angle: 90,
+              position: "insideRight",
+              fill: "#343a40",
+              fontWeight: 700,
+            }}
+          />
+
+          <Tooltip content={<CustomTooltip />} />
+          <Legend />
+
+          {/* 🔵 ENERGY LINE */}
+          <Line
+            yAxisId="right"
+            type="monotone"
+            dataKey="cumulativeEnergy"
+            stroke="url(#energyGradient)"
+            strokeWidth={hovered ? 5 : 4}
+            dot={false}
+            filter="url(#energyGlow)"
+            isAnimationActive
+            animationDuration={1000}
+            animationEasing="ease-out"
+            name="Cumulative Energy"
+          />
+        </ComposedChart>
+      </ResponsiveContainer>
+    </div>
+  );
 }

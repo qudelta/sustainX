@@ -12,9 +12,12 @@ class HeatingMode(str, Enum):
 
 
 class ThermostatConfig(BaseModel):
-    setpoint: float = Field(default=20.0, description="Target temperature in °C")
-    hysteresis: float = Field(default=0.5, ge=0, description="Temperature band in °C")
-    max_power: float = Field(default=3000, ge=0, description="Max heating power in W")
+    setpoint: float = Field(
+        default=20.0, description="Target temperature in °C")
+    hysteresis: float = Field(
+        default=0.5, ge=0, description="Temperature band in °C")
+    max_power: float = Field(
+        default=3000, ge=0, description="Max heating power in W")
 
 
 class FixedPowerConfig(BaseModel):
@@ -22,20 +25,26 @@ class FixedPowerConfig(BaseModel):
 
 
 class ScheduleConfig(BaseModel):
-    hours_per_day: float = Field(ge=0, le=24, description="Hours of heating per day")
+    hours_per_day: float = Field(
+        ge=0, le=24, description="Hours of heating per day")
     power: float = Field(ge=0, description="Heating power when on in W")
-    start_hour: int = Field(default=6, ge=0, le=23, description="Start hour (0-23)")
+    start_hour: int = Field(default=6, ge=0, le=23,
+                            description="Start hour (0-23)")
 
 
 class SimulationConfigSchema(BaseModel):
     # Simulation duration
-    duration_hours: int = Field(default=24, ge=1, le=8760, description="Simulation duration in hours")
-    timestep_minutes: int = Field(default=15, ge=1, le=60, description="Timestep in minutes")
-    
+    duration_hours: int = Field(
+        default=24, ge=1, le=8760, description="Simulation duration in hours")
+    timestep_minutes: int = Field(
+        default=15, ge=1, le=60, description="Timestep in minutes")
+
     # Environmental conditions
-    outdoor_temperature: float = Field(default=5.0, description="Outdoor temperature in °C")
-    initial_indoor_temp: float = Field(default=18.0, description="Initial indoor temperature in °C")
-    
+    outdoor_temperature: float = Field(
+        default=5.0, description="Outdoor temperature in °C")
+    initial_indoor_temp: float = Field(
+        default=18.0, description="Initial indoor temperature in °C")
+
     # Heating configuration
     heating_mode: HeatingMode = HeatingMode.THERMOSTAT
     thermostat: Optional[ThermostatConfig] = None
@@ -62,6 +71,7 @@ class TimeSeriesPoint(BaseModel):
     time_minutes: int
     indoor_temp: float
     heating_on: bool
+    outdoor_temp: float
     heating_power: float
 
 
@@ -80,7 +90,7 @@ class SimulationJobResponse(BaseModel):
     created_at: datetime
     started_at: Optional[datetime]
     completed_at: Optional[datetime]
-    
+
     class Config:
         from_attributes = True
 
@@ -88,12 +98,12 @@ class SimulationJobResponse(BaseModel):
 class SimulationResultResponse(BaseModel):
     id: str
     job_id: str
-    time_series: List[dict]
+    time_series: List[TimeSeriesPoint]
     total_energy_kwh: float
     heat_loss_breakdown: dict
     insights: Optional[List[dict]]
     report_file_key: Optional[str]
     created_at: datetime
-    
+
     class Config:
         from_attributes = True

@@ -1,5 +1,5 @@
 # Build stage
-FROM node:20-alpine AS builder
+FROM node:20-slim AS builder
 
 WORKDIR /app
 
@@ -10,7 +10,7 @@ COPY . .
 RUN npm run build
 
 # Development stage
-FROM node:20-alpine AS development
+FROM node:20-slim AS development
 
 WORKDIR /app
 
@@ -24,16 +24,10 @@ CMD ["npm", "run", "dev"]
 # Production stage
 FROM nginx:alpine AS production
 
-# Remove default nginx config
 RUN rm /etc/nginx/conf.d/default.conf
-
-# Copy custom nginx config
 COPY nginx.conf /etc/nginx/conf.d/default.conf
-
-# Copy built assets
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Create non-root user
 RUN adduser -D -u 1001 appuser && \
     chown -R appuser:appuser /usr/share/nginx/html && \
     chown -R appuser:appuser /var/cache/nginx && \

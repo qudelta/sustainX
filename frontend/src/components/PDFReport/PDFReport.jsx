@@ -18,16 +18,32 @@ export default function PDFReport({ result, job }) {
             // Date
             doc.setFontSize(10);
             doc.text(`Generated: ${new Date().toLocaleString()}`, 20, 30);
-            doc.text(`Simulation completed: ${new Date(job.completed_at).toLocaleString()}`, 20, 36);
+            doc.text(
+                `Simulation completed: ${new Date(job.completed_at).toLocaleString()}`,
+                20,
+                36
+            );
 
             // Summary
             doc.setFontSize(14);
             doc.text('Summary', 20, 50);
 
             doc.setFontSize(11);
-            doc.text(`Total Energy Consumption: ${result.total_energy_kwh.toFixed(2)} kWh`, 20, 60);
-            doc.text(`Simulation Duration: ${job.config.duration_hours || 24} hours`, 20, 68);
-            doc.text(`Outdoor Temperature: ${job.config.outdoor_temperature || 5}°C`, 20, 76);
+            doc.text(
+                `Total Energy Consumption: ${result.total_energy_kwh.toFixed(2)} kWh`,
+                20,
+                60
+            );
+            doc.text(
+                `Simulation Duration: ${job.config.duration_hours || 24} hours`,
+                20,
+                68
+            );
+            doc.text(
+                `Outdoor Temperature: ${job.config.outdoor_temperature || 5}°C`,
+                20,
+                76
+            );
 
             // Heat Loss Breakdown
             doc.setFontSize(14);
@@ -36,12 +52,18 @@ export default function PDFReport({ result, job }) {
             doc.setFontSize(11);
             const breakdown = result.heat_loss_breakdown;
             let y = 104;
+
             Object.entries(breakdown).forEach(([key, value]) => {
                 if (key !== 'total' && value > 0) {
-                    doc.text(`${key.charAt(0).toUpperCase() + key.slice(1)}: ${value.toFixed(1)} Wh`, 25, y);
+                    doc.text(
+                        `${key.charAt(0).toUpperCase() + key.slice(1)}: ${value.toFixed(1)} Wh`,
+                        25,
+                        y
+                    );
                     y += 8;
                 }
             });
+
             doc.text(`Total: ${breakdown.total?.toFixed(1) || 0} Wh`, 25, y);
 
             // Insights
@@ -51,8 +73,12 @@ export default function PDFReport({ result, job }) {
 
                 doc.setFontSize(10);
                 let insightY = y + 30;
+
                 result.insights.forEach((insight, index) => {
-                    const lines = doc.splitTextToSize(`${index + 1}. ${insight.message}`, 170);
+                    const lines = doc.splitTextToSize(
+                        `${index + 1}. ${insight.message}`,
+                        170
+                    );
                     doc.text(lines, 20, insightY);
                     insightY += lines.length * 6 + 4;
                 });
@@ -72,8 +98,22 @@ export default function PDFReport({ result, job }) {
     };
 
     return (
-        <Button variant="light" onClick={generatePDF} loading={isGenerating}>
-            📄 Download PDF Report
+        <Button
+            onClick={generatePDF}
+            loading={isGenerating}
+            radius="md"
+            size="md"
+            variant="gradient"
+            gradient={{ from: 'blue', to: 'cyan', deg: 90 }}
+            leftSection={<span style={{ fontSize: 18 }}>📄</span>}
+            styles={{
+                root: {
+                    fontWeight: 600,
+                    letterSpacing: '0.3px',
+                },
+            }}
+        >
+            Download PDF Report
         </Button>
     );
 }
