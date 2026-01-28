@@ -17,6 +17,13 @@ MATERIAL_K_VALUES = {
     "steel": 50.0,
 }
 
+WALL_INSULATION_K_VALUES = {
+    "wood_panel": 0.13
+} 
+WALL_INSULATION_AVG_THICKNESS = { #values are in meters
+    "wood_panel": 0.02    
+}
+
 # Window U-values in W/(m²·K) - pre-calculated for standard assemblies
 WINDOW_U_VALUES = {
     "single_glazed": 5.8,
@@ -65,7 +72,7 @@ class HeatLossCalculator:
         self._wall_data: Dict[str, dict] = {}  # Store wall areas and U-values
         self._calculate_geometry()
     
-    def _calculate_u_value(self, k_value: float, thickness_m: float) -> float:
+    def _calculate_u_value(self, k_value: float, thickness_m: float, wall_insulation_k: float, wall_insulation_thickness_m: float) -> float:
         """
         Calculate U-value from thermal conductivity and thickness.
         U = 1 / R_total
@@ -77,7 +84,10 @@ class HeatLossCalculator:
             k_value = 0.8
         
         R_material = thickness_m / k_value
-        R_total = R_INSIDE + R_material + R_OUTSIDE
+        R_insulation = 0
+        if wall_insulation_k > 0 and wall_insulation_thickness_m > 0:
+            R_insulation = wall_insulation_thickness_m / wall_insulation_k
+        R_total = R_INSIDE + R_material + R_insulation + R_OUTSIDE
         return 1.0 / R_total
     
     def _calculate_geometry(self):
@@ -103,9 +113,15 @@ class HeatLossCalculator:
             # Get material k-value
             material = wall.get("material", "brick")
             k_value = MATERIAL_K_VALUES.get(material, 0.8)
+
+            # Get k-value of material used for wall insulation (e.g. wood planks for wood paneling)
+            # and thickness
+            wall_insulation_material = wall.get("wall_insulation_material", "none")
+            wall_insulation_k = WALL_INSULATION_K_VALUES.get(wall_insulation_material, 0.0)
+            wall_insulation_thickness_m = WALL_INSULATION_AVG_THICKNESS.get(wall_insulation_material, 0.0)
             
             # Calculate U-value
-            u_value = self._calculate_u_value(k_value, thickness_m)
+            u_value = self._calculate_u_value(k_value, thickness_m, wall_insulation_k, wall_insulation_thickness_m)
             
             # Store wall data
             self._wall_data[wall["id"]] = {
