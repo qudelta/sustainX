@@ -16,6 +16,7 @@ import {
   Alert,
   MultiSelect,
   Radio,
+  SimpleGrid,
 } from "@mantine/core";
 
 const MATERIALS = [
@@ -24,6 +25,11 @@ const MATERIALS = [
   { value: "wood", label: "Wood" },
   { value: "insulated", label: "Insulated" },
   { value: "glass", label: "Glass" },
+];
+
+const WALL_INSULATION_MATERIALS = [
+  { value: "none", label: "Plain Wall" },
+  { value: "wood_panel", label: "Wood Paneling" },
 ];
 
 const WINDOW_MATERIALS = [
@@ -784,14 +790,27 @@ export default function FloorplanEditor({ floorplan, onChange }) {
                             max={24}
                             description="Wall thickness affects heat loss"
                           />
-                          <Select
-                            label="Material"
-                            data={MATERIALS}
-                            value={wall.material}
-                            onChange={(v) =>
-                              updateWall(wall.id, { material: v })
-                            }
-                          />
+                          <SimpleGrid cols={2}>
+                            <Select
+                              label="Material"
+                              data={MATERIALS}
+                              value={wall.material}
+                              onChange={(v) =>
+                                updateWall(wall.id, { material: v })
+                              }
+                            />
+                            <Select
+                              label="Wall Insulation"
+                              data={WALL_INSULATION_MATERIALS}
+                              value={wall.wall_insulation_material ?? "none"}
+                              onChange={(v) =>
+                                updateWall(wall.id, {
+                                  wall_insulation_material: v,
+                                })
+                              }
+                              description="Optional internal wall insulation layer"
+                            />
+                          </SimpleGrid>
                           <Group grow>
                             <Button
                               size="xs"

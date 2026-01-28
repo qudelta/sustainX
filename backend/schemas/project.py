@@ -5,12 +5,14 @@ from enum import Enum
 
 
 class MaterialType(str, Enum):
+    NONE = "none"
     BRICK = "brick"
     CONCRETE = "concrete"
     WOOD = "wood"
     GLASS = "glass"
     INSULATED = "insulated"
     STEEL = "steel"
+    WOOD_PANEL = "wood_panel"
 
 
 class SealingType(str, Enum):
@@ -30,6 +32,7 @@ class WallSchema(BaseModel):
     thickness: float = Field(default=0.2, description="Wall thickness in meters")
     material: MaterialType = MaterialType.BRICK
     u_value: Optional[float] = Field(default=None, description="U-value override in W/(m²·K)")
+    wall_insulation_material: MaterialType = MaterialType.NONE
 
 
 class WindowSchema(BaseModel):
